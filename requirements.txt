@@ -4,7 +4,5 @@ yfinance
 pandas
 prophet
 scikit-learn
-plotly
 numpy
-matplotlib
 tensorflow
