@@ -6,3 +6,5 @@ prophet
 scikit-learn
 numpy
 tensorflow
+groq
+python-dotenv
