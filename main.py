@@ -6,8 +6,17 @@ from models.time_series import run_time_series
 from models.decision_tree import run_decision_tree
 from models.monte_carlo import run_monte_carlo
 from fastapi.middleware.cors import CORSMiddleware
+from groq import Groq
+from dotenv import load_dotenv
+import os
+import json
+
+load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 app = FastAPI()
+
+client = Groq(api_key=GROQ_API_KEY)
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,8 +62,6 @@ def get_stock_data(
     dt_accuracy = float(dt_accuracy)
     dt_prediciton = int(dt_prediciton)
 
-    # mc_simulations = mc_simulations.tolist()
-
     response = {
         "ts_forecast": ts_forecast,
         "ts_mape": ts_mape,
@@ -66,5 +73,39 @@ def get_stock_data(
         "dt_prediction": dt_prediciton
     }
 
-    return JSONResponse(content=response)
-    
+    try:
+        prompt = f"""
+        You are a helpful financial assistant. 
+        
+        Give your own personal opinion of the current status of this stock.
+        
+        Don't write this as a list, but rather a concise continuous paragraph, using beginner friendly language.
+        Don't name the specific names of ts_forecast, dt_accuracy, etc. Just summarize the results.
+        ts_forecast means time series forecast, containing historical data along with predictions.
+        ts_mape is the MAPE for the time series.
+        mc_simulations is all the simulations of the montecarlo model.
+        mc_histogram is the histogram of the final day of all the simulations.
+        mc_lower_95_CI and mc_upper_95_CI are the 95% confidence intervals of the monte carlo model.
+        dt_accuracy is the accuracy of the decision tree model.
+        dt_prediction is the predicted closing price for the next day from the decision tree model, where -1 is sell, 0 is hold, and 1 is buy
+
+        Stock model JSON:
+        {json.dumps(response)}
+        """
+
+        gpt_response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",  
+            messages=[
+                {"role": "system", "content": "You are a financial analyst."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        summary = gpt_response.choices[0].message.content
+
+    except Exception as e:
+        summary = f"Could not generate summary: {str(e)}"
+
+    response["summary"] = summary
+
+    return JSONResponse(content=response)    
